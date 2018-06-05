@@ -1,0 +1,13 @@
+version: "3"
+services:
+  tests:
+    build: .
+    environment:
+      TF_VAR_sts_endpoint: http://mocksts:5000/
+    command: ["go", "test", "-v"]
+    depends_on:
+      - mocksts
+  mocksts:
+    build: motoserver
+    command: ["moto_server", "sts", "-H", "0.0.0.0", "-p", "5000"]
+
