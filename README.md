@@ -1,4 +1,4 @@
-# AWS Secrets Manager Access Policy
+# AWS Secrets Manager Access Policy [![Build Status](https://travis-ci.org/mergermarket/tf_aws_secrets_access_policy.svg?branch=master)](https://travis-ci.org/mergermarket/tf_aws_secrets_access_policy)
 
 Grants access to a namespace in Secrets Manager for a component in an environment.
 
