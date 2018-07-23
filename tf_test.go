@@ -59,14 +59,13 @@ func ReadTerraformPlan(planFilePath string) *terraform.Plan {
 	return plan
 }
 
-func Setup() *TestingPlan {
+func Setup(tfargs ...string) *TestingPlan {
 	WriteDummyProviderConfig()
     RunTerraformCommand("terraform", "init")
+    basePlanArgs := []string{"terraform", "plan", "-out", PLAN_FILE}
+    tfargs = append(basePlanArgs, tfargs...)
 	RunTerraformCommand(
-        "terraform", "plan",
-        "-out", PLAN_FILE,
-        "-var", "component=a",
-        "-var", "environment=b",
+        tfargs...
     )
 	plan := ReadTerraformPlan(PLAN_FILE)
 	return &TestingPlan{plan}
@@ -79,7 +78,7 @@ type TestingPlan struct {
 func (p *TestingPlan) AssertResource(t *testing.T, resourcePath string) {
 	t.Helper()
 
-    _, ok := FindResource(p.Plan.Diff.Modules, resourcePath)
+    _, ok := p.FindResource(resourcePath)
     if ok {
         t.Logf("Found %s\n", resourcePath)
     } else {
@@ -98,29 +97,29 @@ func (p *TestingPlan) AssertResourceAttribute(
 ) {
 	t.Helper()
 
-    resource, ok := FindResource(p.Plan.Diff.Modules, resourcePath)
+    resource, ok := p.FindResource(resourcePath)
     if !ok {
         t.Errorf("Could not find %s in %s", resourcePath, p.Plan.Diff.Modules)
     }
-    for attrKey, attr := range resource.Attributes {
-        if attrKey == attributeName {
-            if attr.New == attributeValue {
-                t.Logf("Found %s = %s, on %s\n", attributeName, attributeValue, resourcePath)
-                return
-            } else {
-                t.Errorf(
-                    "Expected %s, got %s for %s attribute on %s resource",
-                    attributeValue, attr.New, attributeName, attributeValue,
-                )
-            }
-        }
+    attr, attrOk := p.FindResourceAttribute(resource, attributeName)
+    if !attrOk {
+        t.Errorf("Did not find %s in %s\n", attributeName, resourcePath)
     }
-    t.Errorf("Did not find %s in %s\n", attributeName, resourcePath)
+    if attr.New == attributeValue {
+        t.Logf("Found %s = %s, on %s\n", attributeName, attributeValue, resourcePath)
+        return
+    } else {
+        t.Errorf(
+            "Expected %s, got %s for %s attribute on %s resource",
+            attributeValue, attr.New, attributeName, attributeValue,
+        )
+    }
 }
 
-func FindResource(modules []*terraform.ModuleDiff, resourcePath string) (
+func (p *TestingPlan) FindResource(resourcePath string) (
     *terraform.InstanceDiff, bool,
 ) {
+    modules := p.Plan.Diff.Modules
 	for _, module := range modules {
 		for key, instanceDiff := range module.Resources {
 			if key == resourcePath {
@@ -131,9 +130,44 @@ func FindResource(modules []*terraform.ModuleDiff, resourcePath string) (
     return nil, false
 }
 
+func (p *TestingPlan) FindResourceAttribute(
+    resource *terraform.InstanceDiff, attributeName string,
+) (*terraform.ResourceAttrDiff, bool) {
+    for attrKey, attr := range resource.Attributes {
+        if attrKey == attributeName {
+            return attr, true
+        }
+    }
+    return nil, false
+}
+
 func TestPolicy(t *testing.T) {
-	plan := Setup()
+    args := []string{
+        "-var", "component=mycomponent",
+        "-var", "environment=test",
+    }
+	plan := Setup(args...)
 
 	plan.AssertResource(t, "aws_iam_policy.secrets_policy")
-    plan.AssertResourceAttribute(t, "aws_iam_policy.secrets_policy", "name", "b-a-secrets")
+    plan.AssertResourceAttribute(
+        t, "aws_iam_policy.secrets_policy", "name",
+        "test-mycomponent-secrets",
+    )
+    expectedPolicy := `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mycomponent/test/*"
+    }
+  ]
+}`
+    policyResource, _ := plan.FindResource("aws_iam_policy.secrets_policy")
+    policy, _ := plan.FindResourceAttribute(policyResource, "policy")
+
+    if policy.New != expectedPolicy {
+        t.Errorf("Expected %s, got %s", expectedPolicy, policy.New)
+    }
 }
