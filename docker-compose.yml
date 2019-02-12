@@ -4,10 +4,12 @@ services:
     build: .
     environment:
       TF_VAR_sts_endpoint: http://mocksts:5000/
-    command: ["go", "test", "-v"]
+    volumes:
+      - ${PWD}:/var/run/code/
+    working_dir: "/var/run/code/"
     depends_on:
       - mocksts
+    command: ["go", "test", "-v"]
   mocksts:
-    build: motoserver
-    command: ["moto_server", "sts", "-H", "0.0.0.0", "-p", "5000"]
-
+    image: mergermarket/motoserver
+    command: ["sts", "-H", "0.0.0.0", "-p", "5000"]

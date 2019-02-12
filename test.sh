@@ -8,4 +8,5 @@ remove_resources() {
 
 trap remove_resources EXIT
 
-docker-compose up --build --abort-on-container-exit --exit-code-from tests
+docker-compose build
+docker-compose run tests "${@}"

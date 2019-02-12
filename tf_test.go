@@ -45,10 +45,11 @@ func RunTerraformCommand(args ...string) {
     cmd := exec.Command(args[0], args[1:]...)
 	cmd.Env = append(os.Environ(), "TF_IN_AUTOMATION=1")
 	output, err := cmd.Output()
-    if err != nil {
-        fmt.Println(output)
-        panic(err)
+    if exiterr, ok := err.(*exec.ExitError); ok {
+        fmt.Printf("Output from %s: %s\n", args[0], output)
+        fmt.Printf("stderr: %s\n", exiterr.Stderr)
     }
+    Must(err)
 }
 
 func ReadTerraformPlan(planFilePath string) *terraform.Plan {
