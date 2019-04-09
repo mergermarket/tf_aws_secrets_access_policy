@@ -172,3 +172,35 @@ func TestPolicy(t *testing.T) {
         t.Errorf("Expected %s, got %s", expectedPolicy, policy.New)
     }
 }
+
+func TestPolicyIncludingTeam(t *testing.T) {
+    args := []string{
+        "-var", "component=mycomponent",
+        "-var", "environment=test",
+        "-var", "team=someteam",
+    }
+	plan := Setup(args...)
+
+	plan.AssertResource(t, "aws_iam_policy.secrets_policy")
+    plan.AssertResourceAttribute(
+        t, "aws_iam_policy.secrets_policy", "name",
+        "test-mycomponent-secrets",
+    )
+    expectedPolicy := `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:eu-west-1:123456789012:secret:someteam/mycomponent/test/*"
+    }
+  ]
+}`
+    policyResource, _ := plan.FindResource("aws_iam_policy.secrets_policy")
+    policy, _ := plan.FindResourceAttribute(policyResource, "policy")
+
+    if policy.New != expectedPolicy {
+        t.Errorf("Expected %s, got %s", expectedPolicy, policy.New)
+    }
+}
