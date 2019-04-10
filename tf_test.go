@@ -22,6 +22,7 @@ func WriteDummyProviderConfig() {
 variable "sts_endpoint" {}
 
 provider "aws" {
+  version                     = "2.4"
   skip_credentials_validation = true
   skip_metadata_api_check     = true
   skip_get_ec2_platforms      = true
@@ -62,7 +63,7 @@ func ReadTerraformPlan(planFilePath string) *terraform.Plan {
 
 func Setup(tfargs ...string) *TestingPlan {
 	WriteDummyProviderConfig()
-    RunTerraformCommand("terraform", "init")
+    RunTerraformCommand("terraform", "init", "-upgrade=true")
     basePlanArgs := []string{"terraform", "plan", "-out", PLAN_FILE}
     tfargs = append(basePlanArgs, tfargs...)
 	RunTerraformCommand(
@@ -162,6 +163,38 @@ func TestPolicy(t *testing.T) {
       "Effect": "Allow",
       "Action": "secretsmanager:GetSecretValue",
       "Resource": "arn:aws:secretsmanager:eu-west-1:123456789012:secret:mycomponent/test/*"
+    }
+  ]
+}`
+    policyResource, _ := plan.FindResource("aws_iam_policy.secrets_policy")
+    policy, _ := plan.FindResourceAttribute(policyResource, "policy")
+
+    if policy.New != expectedPolicy {
+        t.Errorf("Expected %s, got %s", expectedPolicy, policy.New)
+    }
+}
+
+func TestPolicyIncludingTeam(t *testing.T) {
+    args := []string{
+        "-var", "component=mycomponent",
+        "-var", "environment=test",
+        "-var", "team=someteam",
+    }
+	plan := Setup(args...)
+
+	plan.AssertResource(t, "aws_iam_policy.secrets_policy")
+    plan.AssertResourceAttribute(
+        t, "aws_iam_policy.secrets_policy", "name",
+        "test-mycomponent-secrets",
+    )
+    expectedPolicy := `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:eu-west-1:123456789012:secret:someteam/mycomponent/test/*"
     }
   ]
 }`
