@@ -63,7 +63,7 @@ func ReadTerraformPlan(planFilePath string) *terraform.Plan {
 
 func Setup(tfargs ...string) *TestingPlan {
 	WriteDummyProviderConfig()
-    RunTerraformCommand("terraform", "init")
+    RunTerraformCommand("terraform", "init", "-upgrade=true")
     basePlanArgs := []string{"terraform", "plan", "-out", PLAN_FILE}
     tfargs = append(basePlanArgs, tfargs...)
 	RunTerraformCommand(
