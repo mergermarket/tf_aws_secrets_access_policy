@@ -22,6 +22,7 @@ func WriteDummyProviderConfig() {
 variable "sts_endpoint" {}
 
 provider "aws" {
+  version                     = "2.4"
   skip_credentials_validation = true
   skip_metadata_api_check     = true
   skip_get_ec2_platforms      = true
